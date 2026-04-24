@@ -1,4 +1,5 @@
 from typing import List
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,21 +8,7 @@ from pydantic import BaseModel, Field, validator
 from .rag import InMemoryLegalRAG
 
 
-app = FastAPI(
-    title="Legal Advisor API",
-    version="1.0.0",
-    description="AI-powered legal consultation API with retrieval-augmented generation"
-)
-
-# Enable CORS for all origins (configure as needed for production)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Global RAG instance
 rag = InMemoryLegalRAG()
 
 
@@ -99,18 +86,47 @@ INDEMNIFICATION: [Service Provider] shall indemnify, defend, and hold harmless [
 }
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Auto-load sample legal documents on startup"""
-    print("[INFO] Loading sample legal documents...")
+def load_sample_documents():
+    """Load sample legal documents on startup (synchronous)"""
+    print("\n[INIT] Loading sample legal documents...")
     for doc_id, text in SAMPLE_DOCUMENTS.items():
         try:
             rag.ingest(doc_id, text)
-            print(f"✓ Loaded {doc_id}")
+            print(f"      ✓ {doc_id}")
         except Exception as e:
-            print(f"✗ Failed to load {doc_id}: {e}")
+            print(f"      ✗ {doc_id}: {e}")
     stats = rag.get_stats()
-    print(f"[INFO] RAG System Ready: {stats['total_chunks']} chunks indexed")
+    print(f"[INIT] Ready: {stats['total_chunks']} chunks indexed from {stats['unique_docs']} documents\n")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for app startup and shutdown.
+    Loads sample documents on startup.
+    """
+    # Startup
+    load_sample_documents()
+    yield
+    # Shutdown (cleanup if needed)
+    pass
+
+
+app = FastAPI(
+    title="Legal Advisor API",
+    version="1.0.0",
+    description="AI-powered legal consultation API with retrieval-augmented generation",
+    lifespan=lifespan
+)
+
+# Enable CORS for all origins (configure as needed for production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class IngestRequest(BaseModel):
@@ -152,20 +168,17 @@ class ChatResponse(BaseModel):
 def health() -> dict:
     """Health check endpoint"""
     stats = rag.get_stats()
-    return {"status": "ok", "version": "1.0.0", "chunks_indexed": stats["total_chunks"]}
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "chunks_indexed": stats["total_chunks"],
+        "documents_loaded": stats["unique_docs"]
+    }
 
 
 @app.post("/ingest", response_model=dict, tags=["Documents"])
 def ingest(payload: IngestRequest) -> dict:
-    """
-    Ingest a legal document for RAG retrieval.
-    
-    Args:
-        payload: Document to ingest (doc_id and text)
-    
-    Returns:
-        Status and number of chunks created
-    """
+    """Ingest a legal document for RAG retrieval."""
     try:
         count = rag.ingest(payload.doc_id, payload.text)
         return {
@@ -180,53 +193,39 @@ def ingest(payload: IngestRequest) -> dict:
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
 def chat(payload: ChatRequest) -> ChatResponse:
-    """
-    Chat with the legal advisor AI.
-    
-    Args:
-        payload: Chat request with message, jurisdiction, and practice area
-    
-    Returns:
-        ChatResponse with answer, citations, and disclaimer
-    """
+    """Chat with the legal advisor AI."""
     try:
-        # Retrieve relevant legal documents
         hits = rag.retrieve(payload.message, top_k=3)
         citations = [
             Citation(doc_id=h["doc_id"], chunk_id=h["chunk_id"], score=h["score"])
             for h in hits
         ]
 
-        # Generate answer based on retrieved documents
         if not hits:
             answer = (
-                "I could not find grounded legal text for this question. "
-                f"The system currently has legal information about: Contract Law, Employment Law, Property Law, Criminal Procedure, and Contract Templates. "
-                f"Please try asking about these topics, or ingest additional documents. "
-                f"(Jurisdiction: {payload.jurisdiction}, Practice Area: {payload.practice_area})"
+                "I could not find relevant legal information for this question. "
+                "Try asking about: Contract Law, Employment Law, Property Law, Criminal Procedure, or Contract Templates."
             )
         else:
             snippets = "\n\n".join(
-                f"[{i+1}] From {h['doc_id']} (Match: {h['score']:.0%}):\n{h['text'][:300]}..."
+                f"[{i+1}] From {h['doc_id']} (Relevance: {h['score']:.0%}):\n{h['text'][:280]}"
                 for i, h in enumerate(hits)
             )
             answer = (
-                f"Based on retrieved legal sources for {payload.jurisdiction} law in {payload.practice_area}:\n\n"
-                f"{snippets}\n\n"
-                "For a comprehensive answer, please review the full documents above or consult a qualified attorney."
+                f"Based on retrieved legal sources:\n\n{snippets}\n\n"
+                "Consult a qualified attorney for specific legal advice."
             )
 
         return ChatResponse(
             answer=answer,
             citations=citations,
             disclaimer=(
-                "DISCLAIMER: This assistant provides general legal information only, not legal advice. "
-                "The responses are based on ingested documents and should not be relied upon for legal decisions. "
-                "Always consult a licensed attorney in your jurisdiction for advice specific to your situation."
+                "DISCLAIMER: General legal information only, not legal advice. "
+                "Always consult a licensed attorney."
             ),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chat request failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
 
 @app.get("/stats", tags=["Admin"])
@@ -237,6 +236,5 @@ def get_stats() -> dict:
         "total_chunks": stats["total_chunks"],
         "indexed": stats["is_indexed"],
         "unique_docs": stats["unique_docs"],
-        "message": "System is ready for queries"
     }
 

@@ -45,8 +45,8 @@ function App() {
     };
 
     checkApiHealth();
-    // Check every 5 seconds
-    const interval = setInterval(checkApiHealth, 5000);
+    // Check every 3 seconds (faster reconnection detection)
+    const interval = setInterval(checkApiHealth, 3000);
     return () => clearInterval(interval);
   }, []);
 
