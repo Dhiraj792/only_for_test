@@ -7,7 +7,6 @@ Input format (JSONL):
 from pathlib import Path
 import json
 
-
 def to_instruction(record: dict) -> dict:
     system = (
         "You are a legal information assistant. Provide general information only, "
