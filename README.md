@@ -7,7 +7,6 @@ This repository is a production-style starter for a **legal advisor chatbot** wi
 - **LLM/RAG stack**: Retrieval-Augmented Generation with legal document chunks
 - **Training pipeline**: Supervised fine-tuning (SFT) data preparation + LoRA training script template
 - **Deployment**: Docker Compose skeleton
-
 > ⚠️ Important: This is an educational engineering template, **not legal advice**. Keep a compliance review step with a licensed attorney before any real-world launch.
 
 ## 1) Recommended Architecture
