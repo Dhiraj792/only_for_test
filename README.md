@@ -25,17 +25,14 @@ This repository is a production-style starter for a **legal advisor chatbot** wi
    - Chunk legal texts and create vector representations
    - Retrieve top-k relevant chunks for each user query
    - Return citations (document name + chunk id)
-
 4. **Generation layer**
    - Prompt template with strict legal-safe policy
    - Use LLM to answer with “not legal advice” disclaimer
    - Refuse unsupported/high-risk requests
-
 5. **Training layer**
    - Build instruction dataset from curated legal Q/A
    - Fine-tune with LoRA on instruction format
    - Evaluate with policy and hallucination tests
-
 6. **Safety layer**
    - Jurisdiction gating and escalation to human counsel
    - Content filters (sensitive, illegal, harmful requests)
