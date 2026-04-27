@@ -8,7 +8,6 @@ This repository is a production-style starter for a **legal advisor chatbot** wi
 - **Training pipeline**: Supervised fine-tuning (SFT) data preparation + LoRA training script template
 - **Deployment**: Docker Compose skeleton
 > ⚠️ Important: This is an educational engineering template, **not legal advice**. Keep a compliance review step with a licensed attorney before any real-world launch.
-
 ## 1) Recommended Architecture
 
 1. **UI layer (React)**
