@@ -1,5 +1,4 @@
 # Legal Advisor Chatbot (End-to-End Project Starter)
-
 This repository is a production-style starter for a **legal advisor chatbot** with:
 
 - **Frontend**: React + Vite
