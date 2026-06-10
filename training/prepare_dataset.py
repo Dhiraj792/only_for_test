@@ -3,7 +3,6 @@
 Input format (JSONL):
 {"question": "...", "answer": "...", "jurisdiction": "US", "source": "..."}
 """
-
 from pathlib import Path
 import json
 
